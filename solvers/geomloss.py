@@ -25,11 +25,11 @@ class Solver(BaseSolver):
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     parameters = {
-        'reg': [1e-2, 1e-1],
+        'blur': [1e-4, 1e-3, 1e-2, 1e-1],
         'use_gpu': [True, False],
     }
 
-    stopping_criterion = SufficientProgressCriterion(patience=2, eps=1e-3)
+    stopping_criterion = SufficientProgressCriterion(patience=10, eps=1e-12)
 
     def skip(self, **kwargs):
         # we skip the solver if use_gpu is True and no GPU is available
@@ -64,20 +64,17 @@ class Solver(BaseSolver):
         assert a.shape == (N,)
         assert b.shape == (M,)
 
-        reg = max(self.reg, 1e-4)
-
         diameter = 3
-        blur = np.sqrt(reg)
-
+        
         if True:
-            scaling = np.exp((np.log(blur) - np.log(diameter)) / (n_iter + 1))
+            scaling = np.exp((np.log(self.blur) - np.log(diameter)) / (n_iter + 2))
         else:
             scaling = 0.9
 
         OT_solver = SamplesLoss(
             "sinkhorn",
             p=2,
-            blur=blur,
+            blur=self.blur,
             scaling=scaling,
             debias=False,
             potentials=True,
@@ -103,8 +100,7 @@ class Solver(BaseSolver):
         f = self.f_ba
         g = self.g_ab
 
-        reg = max(self.reg, 1e-4)
-        K_ij = ((f[:,None] + g[None,:] - C_ij) / reg).exp()
+        K_ij = ((f[:,None] + g[None,:] - C_ij) / self.blur).exp()
         P_ij = K_ij * (self.a[:,None] * self.b[None,:])
         
         return P_ij.detach().cpu().numpy()
