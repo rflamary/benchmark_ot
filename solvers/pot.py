@@ -10,18 +10,17 @@ with safe_import_context() as import_ctx:
 # The benchmark solvers must be named `Solver` and
 # inherit from `BaseSolver` for `benchopt` to work properly.
 class Solver(BaseSolver):
-
     # Name to select the solver in the CLI and to display the results.
-    name = 'POT'
+    name = "POT"
 
-    install_cmd = 'conda'
-    requirements = ['pot']
+    install_cmd = "conda"
+    requirements = ["pot"]
 
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     # All parameters 'p' defined here are available as 'self.p'.
     parameters = {
-        'reg': [0, 1e-2, 1e-1],
+        "reg": [0, 1e-2, 1e-1],
     }
 
     def set_objective(self, x, a, y, b):
@@ -43,8 +42,13 @@ class Solver(BaseSolver):
             self.P = ot.emd(self.a, self.b, M, numItermax=n_iter)
         else:
             self.P = ot.sinkhorn(
-                self.a, self.b, M, self.reg, numItermax=n_iter * 10 + 1,
-                stopThr=0, method="sinkhorn_log",
+                self.a,
+                self.b,
+                M,
+                self.reg,
+                numItermax=n_iter * 10 + 1,
+                stopThr=0,
+                method="sinkhorn_log",
             )
 
     def get_result(self):

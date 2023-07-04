@@ -10,7 +10,6 @@ with safe_import_context() as import_ctx:
 
 # All datasets must be named `Dataset` and inherit from `BaseDataset`
 class Dataset(BaseDataset):
-
     # Name to select the dataset in the CLI and to display the results.
     name = "Simulated"
 
@@ -18,8 +17,8 @@ class Dataset(BaseDataset):
     # the cross product for each key in the dictionary.
     # Any parameters 'param' defined here is available as `self.param`.
     parameters = {
-        'n_samples': [100, 1000],
-        'random_state': [27],
+        "n_samples": [100, 1000],
+        "random_state": [27],
     }
 
     def get_data(self):
@@ -34,7 +33,7 @@ class Dataset(BaseDataset):
         cov_x = np.array([[1, 0], [0, 1]])
 
         mu_y = np.array([1, 1])
-        cov_y = np.array([[1, .8], [.8, 1]])
+        cov_y = np.array([[1, 0.8], [0.8, 1]])
 
         x = rng.randn(n, 2) @ cov_x + mu_x
         y = rng.randn(n + 1, 2) @ cov_y + mu_y
@@ -42,7 +41,7 @@ class Dataset(BaseDataset):
         # uniform distribution on samples
         a, b = np.ones(n) / n, np.ones(n + 1) / (n + 1)
 
-        exact_value = 1.5563711755234795 # computed with closed form in POT
+        exact_value = 1.5563711755234795  # computed with closed form in POT
 
         # The dictionary defines the keyword arguments for `Objective.set_data`
         return dict(x=x, a=a, y=y, b=b, exact_value=exact_value)

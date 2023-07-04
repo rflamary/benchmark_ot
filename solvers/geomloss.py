@@ -11,22 +11,20 @@ with safe_import_context() as import_ctx:
     # Import Geomloss which is based on pytorch.
     import torch
     from geomloss import SamplesLoss
-    
 
 
 class Solver(BaseSolver):
-
     # Name to select the solver in the CLI and to display the results.
-    name = 'GeomLoss'
+    name = "GeomLoss"
 
-    install_cmd = 'conda'
-    requirements = ['torch', 'pykeops', 'pip:geomloss', 'ott-jax']
+    install_cmd = "conda"
+    requirements = ["torch", "pykeops", "pip:geomloss", "ott-jax"]
 
     # List of parameters for the solver. The benchmark will consider
     # the cross product for each key in the dictionary.
     parameters = {
-        'blur': [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6],
-        'use_gpu': [True, False],
+        "blur": [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6],
+        "use_gpu": [True, False],
     }
 
     stopping_criterion = SufficientProgressCriterion(patience=10, eps=1e-12)
@@ -43,11 +41,10 @@ class Solver(BaseSolver):
 
         # Store the problem in torch to use GeomLoss.
         # Use the GPU when it is available.
-        device = 'cuda' if self.use_gpu else 'cpu'
+        device = "cuda" if self.use_gpu else "cpu"
 
         self.x, self.a, self.y, self.b = [
-            torch.from_numpy(t).float().to(device=device)
-            for t in (x, a, y, b)
+            torch.from_numpy(t).float().to(device=device) for t in (x, a, y, b)
         ]
 
     def get_next(self, n_iter):
@@ -65,7 +62,7 @@ class Solver(BaseSolver):
         assert b.shape == (M,)
 
         diameter = 3
-        
+
         if True:
             scaling = np.exp((np.log(self.blur) - np.log(diameter)) / (n_iter + 2))
         else:
@@ -89,7 +86,6 @@ class Solver(BaseSolver):
         assert self.f_ba.shape == (N,)
         assert self.g_ab.shape == (M,)
 
-
     def get_result(self):
         # Return the result from one optimization run.
         x2_i = (self.x**2).sum(dim=1)
@@ -100,7 +96,7 @@ class Solver(BaseSolver):
         f = self.f_ba
         g = self.g_ab
 
-        K_ij = ((f[:,None] + g[None,:] - C_ij) / self.blur).exp()
-        P_ij = K_ij * (self.a[:,None] * self.b[None,:])
-        
+        K_ij = ((f[:, None] + g[None, :] - C_ij) / self.blur).exp()
+        P_ij = K_ij * (self.a[:, None] * self.b[None, :])
+
         return P_ij.detach().cpu().numpy()
