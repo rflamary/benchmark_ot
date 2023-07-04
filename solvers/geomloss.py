@@ -13,11 +13,6 @@ with safe_import_context() as import_ctx:
     from geomloss.sinkhorn_divergence import log_weights, sinkhorn_loop
     from geomloss.sinkhorn_samples import cost_routines, softmin_tensorized
 
-    # Using OTT to get an output compatible with the objective.
-    import ott
-    from ott.geometry import pointcloud
-    from ott.problems.linear import linear_problem
-    from ott.solvers.linear.sinkhorn import SinkhornOutput
 
 
 class Solver(BaseSolver):
@@ -46,15 +41,6 @@ class Solver(BaseSolver):
     def set_objective(self, x, a, y, b):
         # Create a ott problem based on jax to compute the output \
         # of the solver.
-        x_jax, y_jax, a_jax, b_jax = map(
-            lambda x: jnp.array(x), (x, y, a, b)
-        )
-        self.ot_prob = linear_problem.LinearProblem(
-            pointcloud.PointCloud(
-                x_jax, y_jax, epsilon=self.reg,
-                cost_fn=ott.geometry.costs.SqPNorm(p=2)
-            ), a_jax, b_jax,
-        )
 
         # Store the problem in torch to use GeomLoss.
         # Use the GPU when it is available.
