@@ -42,5 +42,7 @@ class Dataset(BaseDataset):
         # uniform distribution on samples
         a, b = np.ones(n) / n, np.ones(n + 1) / (n + 1)
 
+        exact_value = 1.5563711755234795 # computed with closed form in POT
+
         # The dictionary defines the keyword arguments for `Objective.set_data`
-        return dict(x=x, a=a, y=y, b=b)
+        return dict(x=x, a=a, y=y, b=b, exact_value=exact_value)
