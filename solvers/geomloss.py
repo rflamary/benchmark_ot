@@ -10,9 +10,8 @@ with safe_import_context() as import_ctx:
 
     # Import Geomloss which is based on pytorch.
     import torch
-    from geomloss.sinkhorn_divergence import log_weights, sinkhorn_loop
-    from geomloss.sinkhorn_samples import cost_routines, softmin_tensorized
-
+    from geomloss import SamplesLoss
+    
 
 
 class Solver(BaseSolver):
@@ -30,7 +29,7 @@ class Solver(BaseSolver):
         'use_gpu': [True, False],
     }
 
-    stopping_criterion = SufficientProgressCriterion(patience=50)
+    stopping_criterion = SufficientProgressCriterion(patience=2, eps=1e-3)
 
     def skip(self, **kwargs):
         # we skip the solver if use_gpu is True and no GPU is available
@@ -47,53 +46,65 @@ class Solver(BaseSolver):
         device = 'cuda' if self.use_gpu else 'cpu'
 
         self.x, self.a, self.y, self.b = [
-            torch.from_numpy(t).float().to(device=device)[None]
+            torch.from_numpy(t).float().to(device=device)
             for t in (x, a, y, b)
         ]
+
+    def get_next(self, n_iter):
+        return n_iter + 1
 
     def run(self, n_iter):
         # content of `sinkhorn_tensorized` from
         # https://github.com/jeanfeydy/geomloss/blob/main/geomloss/sinkhorn_samples.py
         x, y, a, b = self.x, self.y, self.a, self.b
-        # Retrieve the batch size B, the numbers of samples N, M
-        # and the size of the ambient space D:
-        B, N, D = x.shape
-        _, M, _ = y.shape
 
-        # Geomloss use the eps schedule to specify the number of iterations.
-        # We use a fix schedule here.
-        eps = self.reg
-        eps_list = [eps for _ in range(10*n_iter + 1)]
-        # Select the squared euclidean cost
-        cost = cost_routines[2]
-        # Compute the relevant cost matrices C(x_i, y_j), C(y_j, x_i), etc.
-        C_xy = cost(x, y)  # (B,N,M) torch Tensor
-        C_yx = C_xy.T
-        self.C = C_xy
+        N, D = x.shape
+        M, Dp = y.shape
+        assert D == Dp
+        assert a.shape == (N,)
+        assert b.shape == (M,)
 
-        # Use an optimal transport solver to retrieve the dual potentials:
-        f_aa, g_bb, g_ab, f_ba = sinkhorn_loop(
-            softmin_tensorized,
-            log_weights(a),
-            log_weights(b),
-            None,
-            None,
-            C_xy,
-            C_yx,
-            eps_list,
-            rho=None,
+        reg = max(self.reg, 1e-4)
+
+        diameter = 3
+        blur = np.sqrt(reg)
+
+        if True:
+            scaling = np.exp((np.log(blur) - np.log(diameter)) / (n_iter + 1))
+        else:
+            scaling = 0.9
+
+        OT_solver = SamplesLoss(
+            "sinkhorn",
+            p=2,
+            blur=blur,
+            scaling=scaling,
             debias=False,
+            potentials=True,
+            verbose=True,
         )
+
+        f_ba, g_ab = OT_solver(a, x, b, y)
+
         self.f_ba = f_ba.view_as(a)
         self.g_ab = g_ab.view_as(b)
 
+        assert self.f_ba.shape == (N,)
+        assert self.g_ab.shape == (M,)
+
+
     def get_result(self):
         # Return the result from one optimization run.
-        f = self.f_ba + self.reg*log_weights(self.a)
-        g = self.g_ab + self.reg*log_weights(self.b)
-        out = SinkhornOutput(
-            f=jnp.array(f.detach().cpu().numpy()[0]),
-            g=jnp.array(g.detach().cpu().numpy()[0]),
-            ot_prob=self.ot_prob,
-        )
-        return np.array(out.matrix)
+        x2_i = (self.x**2).sum(dim=1)
+        y2_j = (self.y**2).sum(dim=1)
+        C_ij = self.x @ self.y.T
+        C_ij = (x2_i[:, None] + y2_j[None, :]) / 2 - C_ij
+
+        f = self.f_ba
+        g = self.g_ab
+
+        reg = max(self.reg, 1e-4)
+        K_ij = ((f[:,None] + g[None,:] - C_ij) / reg).exp()
+        P_ij = K_ij * (self.a[:,None] * self.b[None,:])
+        
+        return P_ij.detach().cpu().numpy()
